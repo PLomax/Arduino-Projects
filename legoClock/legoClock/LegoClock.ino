@@ -1,3 +1,11 @@
+/*
+      Lego Clock
+      Created 22/11/2018
+      
+      Last updated 22/11/2018
+  */
+
+
 #include <SoftwareSerial.h>
 #include <LiquidCrystal_I2C.h>
 
@@ -11,6 +19,28 @@ int mintueInt=0;
 int lastCheckCount =0;
 
 LiquidCrystal_I2C lcd(0x3F, 2, 1, 0, 4, 5, 6, 7, 3, POSITIVE);  // Set the LCD I2C address, if it's not working try 0x27.
+
+
+//Stepper Motor Control
+
+//threashold buttons
+const int btTop_A    = 2;
+const int btBottom_A = 3;
+
+//const int btTop_B    = 4;
+//const int btBottom_B = 5;
+
+int buttonStateTopA = 0; 
+int buttonStateBottomA = 0; 
+
+//Stepper connections
+const int PUL_A = 8; //define Pulse pin
+const int DIR_A = 7; //define Direction pin
+const int ENA_A = 6; //define Enable Pin
+
+//const int PUL_B = 11; //define Pulse pin
+//const int DIR_B = 10;//define Direction pin
+//const int ENA_B = 9;//define Enable Pin
 
 void setup() {
   lcd.begin(16,2);   // iInit the LCD for 16 chars 2 lines
@@ -27,10 +57,22 @@ void setup() {
   delay(500);// lets the messag  
   lcd.setCursor(0,0); //First line 
   lcd.print("                 ");
+
+  //Stepper settings
+   pinMode(PUL_A, OUTPUT);
+   pinMode(DIR_A, OUTPUT);
+   pinMode(ENA_A, OUTPUT);
+   pinMode(btTop_A, INPUT);
+   pinMode(btBottom_A, INPUT);
+   digitalWrite(btTop_A, HIGH); //initialise the button to HIGH
+   digitalWrite(btBottom_A, HIGH);//initialise the button to HIGH
+  
+  
+  
 }
 
 void loop() {
-
+   delay(500); // for stepper but can be removed
    lastCheckCount++;
    String lastCheckStr = "";    
    String response = "";
@@ -84,6 +126,33 @@ void loop() {
         lcd.print("wibble:"+lastCheckStr);
         hourInt = hourStr.toInt();
         minuteInt = minuteStr.toInt();
+        
+        //move the motors
+        
+        if(hourInt > 24)
+        {
+          reverseA(24);
+          delay(1000);
+
+        }
+         else
+         {
+           if(hourInt == 24) //midnight
+           {
+               reverseA(25); //25 equals bottom switch trigger
+               delay(100);
+               forwardA(1); 
+           }
+           else
+           {
+               reverseA(25);
+               delay(100);
+               float rotations = hourInt;
+               forwardA(rotations + 1); //position 1 will be midnight, postion 2 will be 1am etc
+               delay(1000);
+           }
+         }
+        
       }
     }
     
@@ -98,3 +167,75 @@ void loop() {
 
 
 }
+
+
+void releaseMotorA()
+{
+    delay(100);
+    digitalWrite(DIR_A,LOW);
+    digitalWrite(ENA_A,LOW);
+    digitalWrite(PUL_A,LOW);
+    delay(100);
+}
+
+void forwardA(float rotations)
+{
+       long rotationCount = 6400 * rotations;
+       
+       buttonStateTopA = digitalRead(btTop_A);
+       Serial.print("\nForward:\ntopState:");
+       Serial.println(buttonStateTopA);
+       for (long i = 0; i<rotationCount; i++)    //Forward 5000 steps
+       {
+              if (buttonStateTopA == HIGH)//TOP switch triggered exit function
+              {
+                    Serial.print("TOP switch triggered exit function");
+                    break; 
+              }
+
+              digitalWrite(DIR_A, LOW);
+              digitalWrite(ENA_A, HIGH);
+              digitalWrite(PUL_A, HIGH);
+              delayMicroseconds(50);
+              digitalWrite(PUL_A, LOW);
+              delayMicroseconds(50);
+
+              buttonStateTopA = digitalRead(btTop_A);
+       }
+       
+       releaseMotorA();
+       
+}
+
+
+ 
+
+void reverseA(float rotations)
+{
+       long rotationCount = 6400 * rotations;
+       
+       buttonStateBottomA = digitalRead(btBottom_A);
+       Serial.print("\nReverse:\nbottomState:");
+       Serial.println(buttonStateBottomA);
+       
+       for (long i = 0; i < rotationCount; i++)   //Backward 5000 steps
+       {
+              if (buttonStateBottomA == HIGH) //BOTTOM switch triggered exit function
+              {
+                    Serial.print("BOTTOM switch triggered exit function");
+                    break;  
+              }
+              digitalWrite(DIR_A, HIGH);
+              digitalWrite(ENA_A, HIGH);
+              digitalWrite(PUL_A, HIGH);
+              delayMicroseconds(60);
+              digitalWrite(PUL_A, LOW);
+              delayMicroseconds(60);
+              
+              buttonStateBottomA = digitalRead(btBottom_A);
+       }
+
+      releaseMotorA();
+}
+
+
