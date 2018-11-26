@@ -129,27 +129,40 @@ void loop() {
         
         //move the motors
         
-        if(hourInt > 24)
+        if(hourInt >= 24 || hourInt < 0) // should never happen
         {
-          reverseA(24);
+          reverseA(24); 
           delay(1000);
 
         }
          else
          {
-           if(hourInt == 24) //midnight
+           if(hourInt == 0) //midnight
            {
-               reverseA(25); //25 equals bottom switch trigger
+               reverseA(24); //move to bottom switch trigger
                delay(100);
-               forwardA(1); 
+               forwardA(1); // move to the first position 
            }
            else
            {
-               reverseA(25);
-               delay(100);
-               float rotations = hourInt;
-               forwardA(rotations + 1); //position 1 will be midnight, postion 2 will be 1am etc
-               delay(1000);
+               if(hourInt < 13)
+               {
+                     reverseA(24); // go to the bottom
+                     delay(100);
+                     float rotations = hourInt;
+                     forwardA(rotations + 1); //position 1 will be midnight, postion 2 will be 1am etc
+                     delay(1000);
+               }
+                 else
+               {
+                     forwardA(24); // go to the top
+                     delay(100);
+                     float rotations = hourInt;
+                     reverseA(rotations - 1); //position 24 will be 11pm, postion 23 will be 10pm etc
+                     delay(1000);
+                 
+                 
+               }
            }
          }
         
