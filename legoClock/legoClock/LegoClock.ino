@@ -9,7 +9,7 @@
 #include <SoftwareSerial.h>
 #include <LiquidCrystal_I2C.h>
 
-SoftwareSerial esp8266Module(10,11); //RX,TX
+SoftwareSerial esp8266Module(9,10); //RX,TX
 String hourStr = "";
 String minuteStr="";
 String dateTimeVal = "";
@@ -23,24 +23,27 @@ LiquidCrystal_I2C lcd(0x3F, 2, 1, 0, 4, 5, 6, 7, 3, POSITIVE);  // Set the LCD I
 
 //Stepper Motor Control
 
-//threashold buttons
+//threshold buttons
 const int btTop_Hour    = 2;
 const int btBottom_Hour = 3;
 
-//const int btTop_B    = 4;
-//const int btBottom_B = 5;
+const int btTop_Minute    = 4;
+const int btBottom_Minute = 5;
 
-int buttonStateTopHour = 0; 
-int buttonStateBottomHour = 0; 
+int btStateTopHour = 0; 
+int btStateBottomHour = 0; 
+
+int btStateTopMinute = 0; 
+int btStateBottomMinute = 0; 
 
 //Stepper connections
 const int PUL_Hour = 8; //define Pulse pin
 const int DIR_Hour = 7; //define Direction pin
 const int ENA_Hour = 6; //define Enable Pin
 
-//const int PUL_B = 11; //define Pulse pin
-//const int DIR_B = 10;//define Direction pin
-//const int ENA_B = 9;//define Enable Pin
+const int PUL_Minute = 13; //define Pulse pin
+const int DIR_Minute = 12;//define Direction pin
+const int ENA_Minute = 11;//define Enable Pin
 
 void setup() {
   lcd.begin(16,2);   // iInit the LCD for 16 chars 2 lines
@@ -58,7 +61,7 @@ void setup() {
   lcd.setCursor(0,0); //First line 
   lcd.print("                 ");
 
-  //Stepper settings
+  //Hour Stepper settings
    pinMode(PUL_Hour, OUTPUT);
    pinMode(DIR_Hour, OUTPUT);
    pinMode(ENA_Hour, OUTPUT);
@@ -67,7 +70,14 @@ void setup() {
    digitalWrite(btTop_Hour, HIGH); //initialise the button to HIGH
    digitalWrite(btBottom_Hour, HIGH);//initialise the button to HIGH
   
-  
+  //Minute Stepper settings
+   pinMode(PUL_Minute, OUTPUT);
+   pinMode(DIR_Minute, OUTPUT);
+   pinMode(ENA_Minute, OUTPUT);
+   pinMode(btTop_Minute, INPUT);
+   pinMode(btBottom_Minute, INPUT);
+   digitalWrite(btTop_Minute, HIGH); //initialise the button to HIGH
+   digitalWrite(btBottom_Minute, HIGH);//initialise the button to HIGH  
   
 }
 
@@ -197,6 +207,40 @@ void setHour()
 void setMinute()
 {
    Serial.println(minuteInt); 
+         if(minuteInt >= 60 || minuteInt < 0) // should never happen
+            {
+              reverseHourMotor(60); 
+              delay(1000);
+            }
+             else
+             {
+               if(minuteInt == 0) //60 minutes
+               {
+                   reverseHourMotor(60); //move to bottom switch trigger
+                   delay(100);
+                   forwardHourMotor(1); // move to the first position 
+               }
+               else
+               {
+                   if(minuteInt < 30)
+                   {
+                         reverseHourMotor(60); // go to the bottom
+                         delay(100);
+                         float rotations = minuteInt;
+                         forwardHourMotor(rotations + 1); //position 1 will be 60th minute, postion 2 will be 1 min etc
+                         delay(1000);
+                   }
+                     else
+                   {
+                         forwardHourMotor(60); // go to the top
+                         delay(100);
+                         float rotations = 60-minuteInt;
+                         reverseHourMotor(rotations); //position 60 will be 59 min, postion 59 will be 58 min etc
+                         delay(1000);
+                   }
+               }
+             }// end of else 
+   
 }
 
 void releaseHourMotor()
@@ -208,19 +252,91 @@ void releaseHourMotor()
     delay(100);
 }
 
-void forwardHourMotor(float rotations)
+void releaseMinuteMotor()
+{
+    delay(100);
+    digitalWrite(DIR_Minute,LOW);
+    digitalWrite(ENA_Minute,LOW);
+    digitalWrite(PUL_Minute,LOW);
+    delay(100);
+}
+
+void forwardMinuteMotor(float rotations)
 {
        long rotationCount = 6400 * rotations;
        
-       buttonStateTopHour = digitalRead(btTop_Hour);
+       btStateTopMinute = digitalRead(btTop_Minute);
        Serial.print("\nForward:\ntopState:");
-       Serial.println(buttonStateTopHour);
+       Serial.println(btStateTopMinute);
        Serial.print("\nrotations:");
        Serial.println(rotationCount);  
             
        for (long i = 0; i<rotationCount; i++)    //Forward 5000 steps
        {
-              if (buttonStateTopHour == HIGH)//TOP switch triggered exit function
+              if (btStateTopMinute == HIGH)//TOP switch triggered exit function
+              {
+                    Serial.print("TOP switch triggered exit function");
+                    break; 
+              }
+
+              digitalWrite(DIR_Minute, LOW);
+              digitalWrite(ENA_Minute, HIGH);
+              digitalWrite(PUL_Minute, HIGH);
+              delayMicroseconds(50);
+              digitalWrite(PUL_Minute, LOW);
+              delayMicroseconds(50);
+
+              btStateTopMinute = digitalRead(btTop_Minute);
+       }
+       
+       releaseMinuteMotor();
+}
+
+void reverseMinuteMotor(float rotations)
+{
+
+       //6400 = 40mm travel
+       //3200 = 20mm travel
+       long rotationCount = 6400 * rotations;
+       
+       btStateBottomMinute = digitalRead(btBottom_Minute);
+       Serial.print("\nReverse:\nbottomState:");
+       Serial.println(btStateBottomMinute);
+       Serial.print("\nrotations:");
+       Serial.println(rotationCount);       
+       for (long i = 0; i < rotationCount; i++)   //Backward 5000 steps
+       {
+              if (btStateBottomMinute == HIGH) //BOTTOM switch triggered exit function
+              {
+                    Serial.print("BOTTOM switch triggered exit function");
+                    break;  
+              }
+              digitalWrite(DIR_Minute, HIGH);
+              digitalWrite(ENA_Minute, HIGH);
+              digitalWrite(PUL_Minute, HIGH);
+              delayMicroseconds(50);
+              digitalWrite(PUL_Minute, LOW);
+              delayMicroseconds(50);
+              
+              btStateBottomMinute = digitalRead(btBottom_Minute);
+       }
+
+      releaseMinuteMotor();
+}
+
+void forwardHourMotor(float rotations)
+{
+       long rotationCount = 6400 * rotations;
+       
+       btStateTopHour = digitalRead(btTop_Hour);
+       Serial.print("\nForward:\ntopState:");
+       Serial.println(btStateTopHour);
+       Serial.print("\nrotations:");
+       Serial.println(rotationCount);  
+            
+       for (long i = 0; i<rotationCount; i++)    //Forward 5000 steps
+       {
+              if (btStateTopHour == HIGH)//TOP switch triggered exit function
               {
                     Serial.print("TOP switch triggered exit function");
                     break; 
@@ -233,11 +349,10 @@ void forwardHourMotor(float rotations)
               digitalWrite(PUL_Hour, LOW);
               delayMicroseconds(50);
 
-              buttonStateTopHour = digitalRead(btTop_Hour);
+              btStateTopHour = digitalRead(btTop_Hour);
        }
        
        releaseHourMotor();
-       
 }
 
 
@@ -247,14 +362,14 @@ void reverseHourMotor(float rotations)
 {
        long rotationCount = 6400 * rotations;
        
-       buttonStateBottomHour = digitalRead(btBottom_Hour);
+       btStateBottomHour = digitalRead(btBottom_Hour);
        Serial.print("\nReverse:\nbottomState:");
-       Serial.println(buttonStateBottomHour);
+       Serial.println(btStateBottomHour);
        Serial.print("\nrotations:");
        Serial.println(rotationCount);       
        for (long i = 0; i < rotationCount; i++)   //Backward 5000 steps
        {
-              if (buttonStateBottomHour == HIGH) //BOTTOM switch triggered exit function
+              if (btStateBottomHour == HIGH) //BOTTOM switch triggered exit function
               {
                     Serial.print("BOTTOM switch triggered exit function");
                     break;  
@@ -266,7 +381,7 @@ void reverseHourMotor(float rotations)
               digitalWrite(PUL_Hour, LOW);
               delayMicroseconds(50);
               
-              buttonStateBottomHour = digitalRead(btBottom_Hour);
+              btStateBottomHour = digitalRead(btBottom_Hour);
        }
 
       releaseHourMotor();
