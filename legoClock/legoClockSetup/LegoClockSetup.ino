@@ -2,7 +2,7 @@
       Lego Clock
       Created 22/11/2018
       
-      Last updated 22/11/2018
+      Last updated 15/12/2018
   */
 
 
@@ -21,14 +21,16 @@ int lastCheckCount =0;
 LiquidCrystal_I2C lcd(0x3F, 2, 1, 0, 4, 5, 6, 7, 3, POSITIVE);  // Set the LCD I2C address, if it's not working try 0x27.
 
 
+
+
 //Stepper Motor Control
 
 //threshold buttons
-const int btTop_Hour    = 2;
-const int btBottom_Hour = 3;
+const int btTop_Hour    = 9;
+const int btBottom_Hour = 8;
 
-const int btTop_Minute    = 4;
-const int btBottom_Minute = 5;
+const int btTop_Minute    = 11;
+const int btBottom_Minute = 10;
 
 int btStateTopHour = 0; 
 int btStateBottomHour = 0; 
@@ -37,13 +39,13 @@ int btStateTopMinute = 0;
 int btStateBottomMinute = 0; 
 
 //Stepper connections
-const int PUL_Hour = 8; //define Pulse pin
-const int DIR_Hour = 7; //define Direction pin
-const int ENA_Hour = 6; //define Enable Pin
+const int PUL_Hour = 38; //define Pulse pin
+const int DIR_Hour = 40; //define Direction pin
+const int ENA_Hour = 42; //define Enable Pin
 
-const int PUL_Minute = 13; //define Pulse pin
-const int DIR_Minute = 12;//define Direction pin
-const int ENA_Minute = 11;//define Enable Pin
+const int PUL_Minute = 39; //define Pulse pin
+const int DIR_Minute = 41;//define Direction pin
+const int ENA_Minute = 43;//define Enable Pin
 
 void setup() {
   lcd.begin(16,2);   // iInit the LCD for 16 chars 2 lines
@@ -58,8 +60,7 @@ void setup() {
   lcd.setCursor(0,0); //First line
   lcd.print("OK here we go...");
   delay(500);// lets the messag  
-  lcd.setCursor(0,0); //First line 
-  lcd.print("                 ");
+
 
   //Hour Stepper settings
    pinMode(PUL_Hour, OUTPUT);
@@ -94,7 +95,7 @@ void loop() {
       hourStr= Serial.readString();
       Serial.print("read:");
       if(hourStr.indexOf('\n') > 0)
-         hourStr =  hourStr.substring(0,hourStr.indexOf('\n'));
+         hourStr = minuteStr = hourStr.substring(0,hourStr.indexOf('\n'));
    
   }   
       if(minuteInt != minuteStr.toInt())
@@ -107,6 +108,11 @@ void loop() {
         
         if(hourInt != hourStr.toInt()) // hour has updated
         {
+              lcd.setCursor(0,0); //First line 
+              lcd.print("               ");
+              lcd.setCursor(0,0); //First line 
+              lcd.print(hourStr);
+                          
             hourInt = hourStr.toInt();
             setHour();
             
@@ -120,6 +126,7 @@ void loop() {
 
 void setHour()
 {
+      Serial.print("\nSet Hour:");
       Serial.println(hourInt);
       if(hourInt >= 24 || hourInt < 0) // should never happen
             {
@@ -130,26 +137,26 @@ void setHour()
              {
                if(hourInt == 0) //midnight
                {
-                   reverseHourMotor(1); //move to bottom switch trigger
+                   reverseHourMotor(24); //move to bottom switch trigger
                    delay(100);
-                   forwardHourMotor(24); // move to the first position 
+                   forwardHourMotor(1); // move to the first position 
                }
                else
                {
                    if(hourInt < 13)
                    {
-                         forwardHourMotor(24); // go to the bottom
+                         reverseHourMotor(24); // go to the bottom
                          delay(100);
                          float rotations = hourInt;
-                         reverseHourMotor(rotations + 1); //position 1 will be midnight, postion 2 will be 1am etc
+                         forwardHourMotor(rotations + 1); //position 1 will be midnight, postion 2 will be 1am etc
                          delay(1000);
                    }
                      else
                    {
-                         reverseHourMotor(24); // go to the top
+                         forwardHourMotor(24); // go to the top
                          delay(100);
                          float rotations = 24-hourInt;
-                         forwardHourMotor(rotations); //position 24 will be 11pm, postion 23 will be 10pm etc
+                         reverseHourMotor(rotations); //position 24 will be 11pm, postion 23 will be 10pm etc
                          delay(1000);
                    }
                }
@@ -159,36 +166,37 @@ void setHour()
 
 void setMinute()
 {
+   Serial.print("\nSet Minute:");
    Serial.println(minuteInt); 
          if(minuteInt >= 60 || minuteInt < 0) // should never happen
             {
-              reverseHourMotor(60); 
+              reverseMinuteMotor(60); 
               delay(1000);
             }
              else
              {
                if(minuteInt == 0) //60 minutes
                {
-                   reverseHourMotor(60); //move to bottom switch trigger
+                   reverseMinuteMotor(60); //move to bottom switch trigger
                    delay(100);
-                   forwardHourMotor(1); // move to the first position 
+                   forwardMinuteMotor(0.5); // move to the first position 
                }
                else
                {
                    if(minuteInt < 30)
                    {
-                         reverseHourMotor(60); // go to the bottom
+                         reverseMinuteMotor(60); // go to the bottom
                          delay(100);
                          float rotations = minuteInt;
-                         forwardHourMotor(rotations + 1); //position 1 will be 60th minute, postion 2 will be 1 min etc
+                         forwardMinuteMotor(rotations + 1); //position 1 will be 60th minute, postion 2 will be 1 min etc
                          delay(1000);
                    }
                      else
                    {
-                         forwardHourMotor(60); // go to the top
+                         forwardMinuteMotor(60); // go to the top
                          delay(100);
                          float rotations = 60-minuteInt;
-                         reverseHourMotor(rotations); //position 60 will be 59 min, postion 59 will be 58 min etc
+                         reverseMinuteMotor(rotations); //position 60 will be 59 min, postion 59 will be 58 min etc
                          delay(1000);
                    }
                }
@@ -216,7 +224,15 @@ void releaseMinuteMotor()
 
 void forwardMinuteMotor(float rotations)
 {
-       long rotationCount = 6400 * rotations;
+       //for 59 min  
+      //int rotationSteps = 2495;
+      int rotationSteps = 2700;
+      Serial.println("forwarding"); 
+       //6400 = 40mm travel
+       //3200 = 20mm travel
+       //2494 = 15mm travel (1 minute)
+       
+       long rotationCount = rotationSteps * rotations;
        
        btStateTopMinute = digitalRead(btTop_Minute);
        Serial.print("\nForward:\ntopState:");
@@ -232,7 +248,7 @@ void forwardMinuteMotor(float rotations)
                     break; 
               }
 
-              digitalWrite(DIR_Minute, LOW);
+              digitalWrite(DIR_Minute, HIGH);
               digitalWrite(ENA_Minute, HIGH);
               digitalWrite(PUL_Minute, HIGH);
               delayMicroseconds(50);
@@ -247,10 +263,16 @@ void forwardMinuteMotor(float rotations)
 
 void reverseMinuteMotor(float rotations)
 {
-
+      Serial.println("reversing");
+       //for 59 min  
+      int rotationSteps = 2700;
+       
        //6400 = 40mm travel
        //3200 = 20mm travel
-       long rotationCount = 6400 * rotations;
+       //2494 = 15mm travel (1 minute)
+       
+       long rotationCount = rotationSteps * rotations;
+
        
        btStateBottomMinute = digitalRead(btBottom_Minute);
        Serial.print("\nReverse:\nbottomState:");
@@ -264,7 +286,7 @@ void reverseMinuteMotor(float rotations)
                     Serial.print("BOTTOM switch triggered exit function");
                     break;  
               }
-              digitalWrite(DIR_Minute, HIGH);
+              digitalWrite(DIR_Minute, LOW);
               digitalWrite(ENA_Minute, HIGH);
               digitalWrite(PUL_Minute, HIGH);
               delayMicroseconds(50);
@@ -280,7 +302,8 @@ void reverseMinuteMotor(float rotations)
 void forwardHourMotor(float rotations)
 {
        long rotationCount = 6400 * rotations;
-       
+       Serial.println("forwarding...");
+       delay(200);
        btStateTopHour = digitalRead(btTop_Hour);
        Serial.print("\nForward:\ntopState:");
        Serial.println(btStateTopHour);
@@ -314,7 +337,8 @@ void forwardHourMotor(float rotations)
 void reverseHourMotor(float rotations)
 {
        long rotationCount = 6400 * rotations;
-       
+       Serial.println("reversing...");
+       delay(200);
        btStateBottomHour = digitalRead(btBottom_Hour);
        Serial.print("\nReverse:\nbottomState:");
        Serial.println(btStateBottomHour);

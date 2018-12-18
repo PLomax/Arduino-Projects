@@ -12,7 +12,7 @@ const int btBottom_A = 3;
 int buttonStateTopA = 0; 
 int buttonStateBottomA = 0; 
 
-int intHour = 0;
+int hourInt = 0;
 String recd;
 
 
@@ -112,7 +112,7 @@ void setup() {
 
 void loop() {
   delay(500);
-  intHour =0;
+  hourInt =0;
   Serial.println(".");
   if (Serial.available() > 0)
   {
@@ -121,24 +121,48 @@ void loop() {
       if(recd.indexOf('\n') > 0)
          recd =  recd.substring(0,recd.indexOf('\n'));
    
-      intHour = recd.toInt();
-      Serial.println(intHour);
+      hourInt = recd.toInt();
+      Serial.println(hourInt);
   
 
-      if(intHour > 24)
-      {
-        reverseA(24);
-        delay(1000);
-        
-      }
-       else
-       {
-         reverseA(24);
-         delay(100);
-         float rotations = intHour;
-         forwardA(rotations);
-         delay(1000);
-       }
+        if(hourInt >= 24 || hourInt < 0) // should never happen
+        {
+          reverseA(24); 
+          delay(1000);
+
+        }
+         else
+         {
+           if(hourInt == 0) //midnight
+           {
+               reverseA(24); //move to bottom switch trigger
+               delay(100);
+               forwardA(1); // move to the first position 
+           }
+           else
+           {
+  
+               if(hourInt < 13)
+               {
+                     reverseA(24); // go to the bottom
+                     delay(100);
+                     float rotations = hourInt;
+                     forwardA(rotations + 1); //position 1 will be midnight, postion 2 will be 1am etc
+                     delay(1000);
+               }
+                 else
+               {
+
+                     forwardA(24); // go to the top
+                     delay(100);
+                     float rotations = 23-hourInt;
+                     reverseA(rotations); //position 24 will be 11pm, postion 23 will be 10pm etc
+                     delay(1000);
+                 
+                 
+               }
+           }
+         }
        //reverseA(rotations);
        //delay(1000);
     }
