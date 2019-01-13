@@ -2,7 +2,7 @@
       Lego Clock
       Created 22/11/2018
       
-      Last updated 15/12/2018
+      Last updated 13/01/2019
   */
 
 
@@ -18,7 +18,6 @@ int hourInt = 0;
 int minuteInt=0;
 int lastCheckCount =0;
 
-LiquidCrystal_I2C lcd(0x3F, 2, 1, 0, 4, 5, 6, 7, 3, POSITIVE);  // Set the LCD I2C address, if it's not working try 0x27.
 
 
 //Stepper Motor Control
@@ -45,9 +44,20 @@ const int PUL_Minute = 39; //define Pulse pin
 const int DIR_Minute = 41;//define Direction pin
 const int ENA_Minute = 43;//define Enable Pin
 
+
+
+//LEDs
+const int LED_Top_Hour= 30;
+const int LED_Bottom_Hour= 26;
+const int LED_Top_Minute= 31;
+const int LED_Bottom_Minute= 27;
+
+//Sound
+const int hourSoundPin = 5;
+
+bool initialisedTime = false;
+
 void setup() {
-  lcd.begin(16,2);   // iInit the LCD for 16 chars 2 lines
-  lcd.backlight();   // Turn on the backligt (try lcd.noBaklight() to turn it off)
   Serial.begin(9600);
   Serial.println("starting..");
   esp8266Module.begin(57600);
@@ -55,11 +65,6 @@ void setup() {
 
   Serial.println("lego clock..");
   
-  lcd.setCursor(0,0); //First line
-  lcd.print("OK here we go...");
-  delay(500);// lets the messag  
-  lcd.setCursor(0,0); //First line 
-  lcd.print("                 ");
 
   //Hour Stepper settings
    pinMode(PUL_Hour, OUTPUT);
@@ -78,6 +83,27 @@ void setup() {
    pinMode(btBottom_Minute, INPUT);
    digitalWrite(btTop_Minute, HIGH); //initialise the button to HIGH
    digitalWrite(btBottom_Minute, HIGH);//initialise the button to HIGH  
+
+   //LED Settings
+   pinMode(LED_Top_Hour, OUTPUT);
+   pinMode(LED_Bottom_Hour, OUTPUT);
+   pinMode(LED_Top_Minute, OUTPUT);
+   pinMode(LED_Bottom_Minute, OUTPUT);
+   
+   //turn on LEDs
+   digitalWrite(LED_Top_Hour, HIGH);
+   digitalWrite(LED_Bottom_Hour, HIGH);
+   digitalWrite(LED_Top_Minute, HIGH);
+   digitalWrite(LED_Bottom_Minute, HIGH);
+   
+   //Sound Settings
+   pinMode(hourSoundPin , OUTPUT);
+
+   ledBlink(LED_Top_Minute,5);
+   ledBlink(LED_Bottom_Minute,5);
+   delay(1000);
+   ledBlink(LED_Top_Hour,5);
+   ledBlink(LED_Bottom_Hour,5);
   
 }
 
@@ -110,14 +136,8 @@ void loop() {
     {
       dateString = dateTimeVal.substring(0,index);
       Serial.println(dateString);
-
-      lcd.setCursor(0,0); //First line
-      lcd.print(dateString);
-
       
       String timeString =  dateTimeVal.substring(index+1);
-
-      
       Serial.println(timeString);
       
       int colonIndex = timeString.indexOf(':');
@@ -128,57 +148,85 @@ void loop() {
         minuteStr = timeString.substring(colonIndex+1,colonIndex+3);
         Serial.println(hourStr);
         Serial.println(minuteStr);
-        lcd.setCursor(0,1); //Second line
-        lcd.print(hourStr+":"+minuteStr);
         lastCheckCount =0;
         lastCheckStr = String(lastCheckCount); 
-        lcd.setCursor(6,1); //Second line
-        lcd.print("wibble:   ");
-        lcd.print("wibble:"+lastCheckStr);
         
         if(minuteInt != minuteStr.toInt())
         {
-            
+            int oldMinuteValue = minuteInt;
             minuteInt = minuteStr.toInt();
-            setMinute();
+            setMinute(oldMinuteValue,minuteInt);
 
             //implement minute here
         }         
         
         if(hourInt != hourStr.toInt()) // hour has updated
         {
+            int oldHourValue = hourInt;
             hourInt = hourStr.toInt();
-            setHour();
+            setHour(oldHourValue,hourInt);
             
         }// end of hour test
       }
+
+      initialisedTime = true;
     }
     
     
    }
 
  
-  lcd.setCursor(6,1); //Second line
   lastCheckStr = String(lastCheckCount); 
-  lcd.print("wibble:"+lastCheckStr);
   delay(1000);
 
 
 }
 
 
-void setHour()
+void ledBlink(int pinID, int blinkCount)
+{
+  Serial.println(""); 
+  for(int i=0;i < blinkCount; i++)
+  {
+    digitalWrite(pinID, HIGH);   // turn the LED on (HIGH is the voltage level)
+    delay(200);                       // wait for a second
+    digitalWrite(pinID, LOW);    // turn the LED off by making the voltage LOW
+    delay(100);    
+    Serial.print("*");
+  }
+  Serial.println("");
+  digitalWrite(pinID, HIGH);
+}
+
+void hourChime(int count)
+{
+    if(count > 12)
+      count = count -12;
+  
+    for(int i=0;i<count;i++)
+    {
+    digitalWrite(hourSoundPin, HIGH);
+    delay(1000);
+    digitalWrite(hourSoundPin, LOW);
+    delay(1000);    
+    }
+ }
+
+void setHour(int oldHourValue, int newHourValue)
 {
       Serial.print("\nSet Hour:");
-      Serial.println(hourInt);
-      if(hourInt >= 24 || hourInt < 0) // should never happen
+      Serial.println(newHourValue);
+
+      ledBlink(LED_Top_Hour,3);
+      
+      if(newHourValue >= 24 || newHourValue < 0) // should never happen
             {
               reverseHourMotor(24); 
               delay(1000);
             }
-             else
+            else
              {
-               if(hourInt == 0) //midnight
+               if(newHourValue == 0) //midnight
                {
                    reverseHourMotor(24); //move to bottom switch trigger
                    delay(100);
@@ -186,39 +234,42 @@ void setHour()
                }
                else
                {
-                   if(hourInt < 13)
+                   if(initialisedTime)
                    {
-                         reverseHourMotor(24); // go to the bottom
-                         delay(100);
-                         float rotations = hourInt;
-                         forwardHourMotor(rotations + 1); //position 1 will be midnight, postion 2 will be 1am etc
-                         delay(1000);
+                     forwardHourMotor(newHourValue - oldHourValue); //advance time by 1 hour
+                     delay(1000);                   
+                    
                    }
-                     else
+
+                   else
                    {
-                         forwardHourMotor(24); // go to the top
-                         delay(100);
-                         float rotations = 24-hourInt;
-                         reverseHourMotor(rotations); //position 24 will be 11pm, postion 23 will be 10pm etc
-                         delay(1000);
+                     reverseHourMotor(24); // go to the bottom
+                     delay(100);
+                     float rotations = newHourValue;
+                     forwardHourMotor(rotations + 1); //position 1 will be midnight, postion 2 will be 1am etc
+                     delay(1000);
                    }
                }
              }// end of else  
+
+            hourChime(newHourValue);
 }
 
 
-void setMinute()
+void setMinute(int oldMinuteValue,int newMinuteValue)
 {
+   ledBlink(LED_Top_Minute, 3);
+   
    Serial.print("\nSet Minute:");
    Serial.println(minuteInt); 
-         if(minuteInt >= 60 || minuteInt < 0) // should never happen
+         if(newMinuteValue >= 60 || newMinuteValue < 0) // should never happen
             {
               reverseMinuteMotor(60); 
               delay(1000);
             }
              else
              {
-               if(minuteInt == 0) //60 minutes
+          if(newMinuteValue == 0) //60 minutes
                {
                    reverseMinuteMotor(60); //move to bottom switch trigger
                    delay(100);
@@ -226,22 +277,20 @@ void setMinute()
                }
                else
                {
-                   if(minuteInt < 30)
-                   {
-                         reverseMinuteMotor(60); // go to the bottom
-                         delay(100);
-                         float rotations = minuteInt;
-                         forwardMinuteMotor(rotations + 1); //position 1 will be 60th minute, postion 2 will be 1 min etc
-                         delay(1000);
-                   }
-                     else
-                   {
-                         forwardMinuteMotor(60); // go to the top
-                         delay(100);
-                         float rotations = 60-minuteInt;
-                         reverseMinuteMotor(rotations); //position 60 will be 59 min, postion 59 will be 58 min etc
-                         delay(1000);
-                   }
+                 if(initialisedTime)
+                 {
+                     forwardMinuteMotor(newMinuteValue - oldMinuteValue); //advance minutes by difference
+                     delay(1000);                  
+                 }
+
+                 else
+                 {
+                     reverseMinuteMotor(60); // go to the bottom
+                     delay(100);
+                     float rotations = newMinuteValue;
+                     forwardMinuteMotor(rotations + 1); //position 1 will be 60th minute, postion 2 will be 1 min etc
+                     delay(1000);
+                  }
                }
              }// end of else 
    
